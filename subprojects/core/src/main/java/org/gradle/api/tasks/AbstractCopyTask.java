@@ -37,6 +37,7 @@ import org.gradle.api.internal.file.copy.CopySpecInternal;
 import org.gradle.api.internal.file.copy.CopySpecResolver;
 import org.gradle.api.internal.file.copy.CopySpecSource;
 import org.gradle.api.internal.file.copy.DefaultCopySpec;
+import org.gradle.api.internal.tasks.execution.TaskCachingDisabledReason;
 import org.gradle.api.specs.Spec;
 import org.gradle.internal.nativeplatform.filesystem.FileSystem;
 import org.gradle.internal.reflect.Instantiator;
@@ -44,6 +45,7 @@ import org.gradle.util.DeprecationLogger;
 
 import javax.inject.Inject;
 import java.io.FilterReader;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -65,7 +67,7 @@ public abstract class AbstractCopyTask extends ConventionTask implements CopySpe
             @Override
             public void childSpecAdded(CopySpecInternal.CopySpecAddress path, final CopySpecInternal spec) {
                 if (getState().getExecuting()) {
-                    if (getOutputs().isCacheEnabled() && getProject().getGradle().getStartParameter().isTaskOutputCacheEnabled()) {
+                    if (getOutputs().isCacheEnabled(new ArrayList<TaskCachingDisabledReason>()) && getProject().getGradle().getStartParameter().isTaskOutputCacheEnabled()) {
                         throw new GradleException("It is not allowed to modify child specs of the task at execution time when task output caching is enabled. "
                             + CONFIGURE_SPEC_DURING_CONFIGURATION + ".");
                     }
