@@ -93,6 +93,54 @@ task check {
         'attempting to exclude declared module'            | [group: 'org.gradle', module: 'test']     | ['test-1.45.jar', 'foo-2.0.jar', 'bar-3.0.jar', 'company-4.0.jar', 'other-company-4.0.jar', 'enterprise-5.0.jar', 'baz-6.0.jar']
     }
 
+    @Unroll
+    def "dependency exclude rule when there are both direct and transitive dependencies for #condition"() {
+        given:
+        final String orgGradleGroupId = 'org.gradle'
+        def directDependency = mavenRepo().module(orgGradleGroupId, 'direct', '1.45')
+        def directAndTransitiveDependency = mavenRepo().module(orgGradleGroupId, 'direct-transitive', '1.45')
+        def fooModule = mavenRepo().module(orgGradleGroupId, 'foo', '2.0')
+        fooModule.publish()
+        directDependency.dependsOn(directAndTransitiveDependency)
+        directDependency.publish()
+        directAndTransitiveDependency.dependsOn(fooModule)
+        directAndTransitiveDependency.publish()
+
+        and:
+        buildFile << """
+repositories { maven { url "${mavenRepo().uri}" } }
+configurations { compile }
+dependencies {
+    compile('${directAndTransitiveDependency.groupId}:${
+            directAndTransitiveDependency.artifactId
+        }:${directAndTransitiveDependency.version}') {
+        if (${excludeInDirectAndTransitive}) {
+            exclude module: '${fooModule.artifactId}', group: '${fooModule.groupId}'
+        }
+    }
+    compile('${directDependency.groupId}:${directDependency.artifactId}:${directDependency.version}') {
+        if (${excludeInDirect}) {
+            exclude module: '${fooModule.artifactId}', group: '${fooModule.groupId}'
+        }
+    }
+}
+
+task check {
+    doLast {
+        assert configurations.compile.collect { it.name } == ['direct-1.45.jar', 'direct-transitive-1.45.jar', 'foo-2.0.jar'] // foo-2.0.jar must not be there
+    }
+}
+"""
+
+        expect:
+        succeeds "check"
+
+        where:
+        condition                                          | excludeInDirect                         | excludeInDirectAndTransitive
+        'exclude in direct'                                | true                                    | false
+        'exclude in direct and transitive'                 | false                                   | true
+    }
+
     void "does not resolve module excluded for configuration"() {
         given:
         def repo = mavenRepo
